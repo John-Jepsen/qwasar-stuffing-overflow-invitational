@@ -1,11 +1,13 @@
 let maze;
 let player;
-let gameState = 'playing'; // 'playing', 'won', 'lost'
+let gameState = 'playing'; // 'playing', 'won', 'lost', 'escaped'
 let startTime;
 let remainingTime;
-
+let currentLevel = 0;
+let cellSize = MAZE_CONFIG.cellSize
 // STUDENT TODO: Add turkey sprite image
 let turkeyImg;
+Cconst 
 
 function preload() {
     // Try to load turkey sprite
@@ -24,28 +26,40 @@ function preload() {
 }
 
 function setup() {
+    gameState = "playing"
+    currentLevel = 0;
     let canvas = createCanvas(
         MAZE_CONFIG.cols * MAZE_CONFIG.cellSize + 200,
         MAZE_CONFIG.rows * MAZE_CONFIG.cellSize + 100
     );
     canvas.parent('game-container');
     
+    start_level(0)
+    
+    textFont('Arial');
+}
+
+function start_level(n)
+{
     // Generate maze
-    maze = new Maze(MAZE_CONFIG.rows, MAZE_CONFIG.cols);
+    let rows = MAZE_CONFIG.rows + n * 5;
+    let cols = MAZE_CONFIG.cols + n * 5;
+
+    cellSize = 500 / rows;
+
+    maze = new Maze(rows, cols);
     
     // Initialize player at start (top-left)
     player = {
         row: 0,
         col: 0,
-        targetRow: MAZE_CONFIG.rows - 1,
-        targetCol: MAZE_CONFIG.cols - 1
+        targetRow: rows - 1,
+        targetCol: cols - 1
     };
     
     // Start timer
     startTime = millis();
     remainingTime = MAZE_CONFIG.timeLimit;
-    
-    textFont('Arial');
 }
 
 function draw() {
@@ -84,7 +98,17 @@ function draw() {
     
     // Draw game over messages
     if (gameState === 'won') {
-        drawWinMessage();
+        currentLevel += 1;
+        if (currentLevel >= 4)
+        {
+            gameState = 'escaped'
+            drawWinMessage();
+        }
+        else
+        {
+            gameState = 'playing';
+            start_level(currentLevel);
+        }
     } else if (gameState === 'lost') {
         drawLoseMessage();
     }
@@ -97,20 +121,22 @@ function drawMaze() {
     for (let r = 0; r < maze.rows; r++) {
         for (let c = 0; c < maze.cols; c++) {
             let cell = maze.grid[r][c];
-            let x = c * MAZE_CONFIG.cellSize;
-            let y = r * MAZE_CONFIG.cellSize;
+            let x = c * cellSize;
+            let y = r * cellSize;
             
             // STUDENT TODO: Customize maze cell appearance (stuffing texture)
+            
+            
             // Draw cell background with stuffing-like color
             noStroke();
             fill(210, 180, 140); // Tan color for stuffing
-            rect(x, y, MAZE_CONFIG.cellSize, MAZE_CONFIG.cellSize);
+            rect(x, y, cellSize, cellSize);
             
             // Add texture dots to look like stuffing
             fill(180, 150, 110);
             for (let i = 0; i < 3; i++) {
-                let dx = random(5, MAZE_CONFIG.cellSize - 5);
-                let dy = random(5, MAZE_CONFIG.cellSize - 5);
+                let dx = random(5, cellSize - 5);
+                let dy = random(5, cellSize - 5);
                 ellipse(x + dx, y + dy, 3, 3);
             }
             
@@ -119,44 +145,44 @@ function drawMaze() {
             strokeWeight(3);
             
             if (cell.walls.top) {
-                line(x, y, x + MAZE_CONFIG.cellSize, y);
+                line(x, y, x + cellSize, y);
             }
             if (cell.walls.right) {
-                line(x + MAZE_CONFIG.cellSize, y, 
-                     x + MAZE_CONFIG.cellSize, y + MAZE_CONFIG.cellSize);
+                line(x + cellSize, y, 
+                     x + cellSize, y + cellSize);
             }
             if (cell.walls.bottom) {
-                line(x, y + MAZE_CONFIG.cellSize, 
-                     x + MAZE_CONFIG.cellSize, y + MAZE_CONFIG.cellSize);
+                line(x, y + cellSize, 
+                     x + cellSize, y + cellSize);
             }
             if (cell.walls.left) {
-                line(x, y, x, y + MAZE_CONFIG.cellSize);
+                line(x, y, x, y + cellSize);
             }
         }
     }
 }
 
 function drawGoal() {
-    let x = player.targetCol * MAZE_CONFIG.cellSize;
-    let y = player.targetRow * MAZE_CONFIG.cellSize;
+    let x = player.targetCol * cellSize;
+    let y = player.targetRow * cellSize;
     
     // Pulsing green goal
     let pulse = sin(millis() / 200) * 20 + 200;
     fill(50, pulse, 50, 150);
     noStroke();
-    rect(x + 5, y + 5, MAZE_CONFIG.cellSize - 10, MAZE_CONFIG.cellSize - 10);
+    rect(x + 5, y + 5, cellSize - 10, cellSize - 10);
     
     // Goal text
     fill(255);
     textAlign(CENTER, CENTER);
     textSize(16);
-    text('EXIT', x + MAZE_CONFIG.cellSize / 2, y + MAZE_CONFIG.cellSize / 2);
+    text('EXIT', x + cellSize / 2, y + cellSize / 2);
 }
 
 function drawPlayer() {
-    let x = player.col * MAZE_CONFIG.cellSize + MAZE_CONFIG.cellSize / 2;
-    let y = player.row * MAZE_CONFIG.cellSize + MAZE_CONFIG.cellSize / 2;
-    let size = MAZE_CONFIG.cellSize * 0.7;
+    let x = player.col * cellSize + cellSize / 2;
+    let y = player.row * cellSize + cellSize / 2;
+    let size = cellSize * 0.7;
     
     if (turkeyImg && turkeyImg.width > 0) {
         // Draw turkey image
@@ -198,7 +224,7 @@ function drawPlayer() {
 }
 
 function drawHUD(offsetX, offsetY) {
-    let hudY = offsetY + MAZE_CONFIG.rows * MAZE_CONFIG.cellSize + 20;
+    let hudY = offsetY + 500 + 20;
     
     textAlign(LEFT);
     textSize(20);
@@ -211,10 +237,12 @@ function drawHUD(offsetX, offsetY) {
     
     // Position
     fill(51);
-    text(`Position: (${player.row}, ${player.col})`, offsetX + 200, hudY);
+    text(`Position: (${player.row}, ${player.col})`, offsetX + 100, hudY);
     
     // Goal
-    text(`Goal: (${player.targetRow}, ${player.targetCol})`, offsetX + 400, hudY);
+    text(`Goal: (${player.targetRow}, ${player.targetCol})`, offsetX + 250, hudY);
+
+    text(`Level: (${currentLevel + 1}/4)`, offsetX + 400, hudY);
 }
 
 function drawWinMessage() {
