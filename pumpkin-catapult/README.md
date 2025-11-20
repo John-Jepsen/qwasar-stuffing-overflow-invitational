@@ -1,6 +1,24 @@
 # 🎃 Pumpkin Catapult Physics Game
 
-Launch pumpkins from a catapult to hit Thanksgiving-themed targets!
+Launch pumpkins from a catapult to hit Thanksgiving-themed targets across 3 challenging levels!
+
+## Game Features
+- **3 Progressive Levels** - Increasing difficulty with more targets and faster speeds
+- **Multiple Target Types**:
+  - 🏠 Barns - Stationary ground targets (50 points, explode when hit)
+  - 🦃 Walking Turkeys - Ground targets that move left/right (70-130 points based on size)
+  - 🦃 Flying Turkeys - Aerial targets moving in 2D (70-130 points based on size, fall when hit)
+- **Dynamic Gameplay**:
+  - Random wind affecting projectile trajectory
+  - Variable turkey sizes (small = more points, harder to hit)
+  - Targets placed at random positions and heights each game
+  - Explosion effects on barn hits
+  - Falling turkey animations
+- **Visual Effects**:
+  - Score popups showing points earned
+  - Particle explosions
+  - Animated wind indicators
+  - Custom background image support
 
 ## Prerequisites
 - A modern web browser (Chrome, Firefox, Safari, or Edge)
@@ -10,122 +28,129 @@ Launch pumpkins from a catapult to hit Thanksgiving-themed targets!
 
 1. **Clone or download this repository**
 
-2. **Start a local web server** (choose one method):
+2. **Start a local web server**:
    
-   **Option A: Python 3**
    ```bash
    cd pumpkin-catapult
    python3 -m http.server 8000
    ```
-   
-   **Option B: Node.js http-server**
-   ```bash
-   cd pumpkin-catapult
-   npx http-server -p 8000
-   ```
-   
-   **Option C: VS Code Live Server**
-   - Install the "Live Server" extension
-   - Right-click `index.html` and select "Open with Live Server"
 
 3. **Open your browser** and navigate to:
    - `http://localhost:8000`
 
-## Your Tasks (Complete in ~1 hour)
-
-### ✅ Task 1: Add Pumpkin Projectile Sprite (15 mins)
-Replace the default orange circle with a pumpkin image:
-
-1. Create or find a pumpkin image (recommended size: 40x40 pixels or larger)
-
-2. Save it as `assets/pumpkin.png`
-
-3. Refresh your browser - the projectile should now be a pumpkin!
-
-**Tip:** Make sure the image has a transparent background for best results.
-
-### ✅ Task 2: Add Target Images (15 mins)
-Customize the targets with Thanksgiving-themed images:
-
-1. Create or find target images:
-   - `turkey.png` (recommended size: 60x80 pixels)
-   - `barn.png` (recommended size: 100x100 pixels)
-
-2. Save them in the `assets/` folder
-
-3. Refresh and test - targets should now show your images!
-
-**Optional:** You can add more targets by editing the `targets` array in `game.js`.
-
-### ✅ Task 3: Adjust Angle and Power Ranges (20 mins)
-Tune the gameplay by adjusting launch parameters:
-
-1. Open `game.js` in your text editor
-
-2. Find the `CONFIG` object at the top of the file (lines 1-9)
-
-3. Experiment with these values to make the game more fun:
-   ```javascript
-   minAngle: 10,        // Try: 0-30
-   maxAngle: 80,        // Try: 60-90
-   minPower: 5,         // Try: 3-10
-   maxPower: 25,        // Try: 20-30
-   gravity: 0.3,        // Try: 0.2-0.5
-   targetDistance: 400  // Not used yet, for future features
-   ```
-
-4. Save and refresh to test your changes
-
-5. Adjust until you find a good balance of challenge and fun!
-
-**Goal:** Make it possible to hit both targets with different angle/power combinations.
-
-### ✅ Task 4: Confirm Hit Detection (10 mins)
-Verify that the game properly detects hits:
-
-1. Launch pumpkins at each target
-
-2. Confirm that:
-   - [ ] Score increases by 100 points when you hit a target
-   - [ ] Hit targets disappear from the screen
-   - [ ] "ALL TARGETS HIT!" message appears when both targets are destroyed
-   - [ ] Console logs "Hit!" when collision is detected (press F12 to see console)
-
-3. If hit detection is too hard or too easy, adjust the collision detection:
-   - In `game.js`, find the `updateProjectile()` function (around line 165)
-   - Adjust the collision radius values (currently `target.w/2 + 15` and `target.h/2 + 15`)
-   - Increase the `+ 15` to make hits easier, decrease to make them harder
-
 ## How to Play
-- **UP/DOWN Arrow Keys**: Adjust launch angle
-- **LEFT/RIGHT Arrow Keys**: Adjust launch power
-- **SPACEBAR**: Launch the pumpkin!
 
-Try to hit both targets with the fewest launches possible!
+### Controls
+- **UP/DOWN Arrow Keys**: Adjust launch angle (10° - 80°)
+- **LEFT/RIGHT Arrow Keys**: Adjust launch power
+- **SPACEBAR**: Launch the pumpkin (or advance to next level)
+- **R Key**: Restart game from Level 1
+
+### Game Objective
+Progress through 3 levels by hitting all targets with limited pumpkins (15 per level):
+
+**Level 1:**
+- 3 stationary barns (50 pts each)
+- 2 walking turkeys (70-130 pts based on size)
+- 5 flying turkeys (70-130 pts based on size)
+- Normal speed
+
+**Level 2:**
+- 4 stationary barns
+- 3 walking turkeys  
+- 6 flying turkeys
+- 20% faster movement
+
+**Level 3:**
+- 5 stationary barns
+- 4 walking turkeys
+- 7 flying turkeys
+- 44% faster movement
+
+### Scoring System
+- **Small Turkeys** 🦃 (smallest): 130 points
+- **Medium Turkeys** 🦃: 100 points
+- **Large Turkeys** 🦃 (biggest): 70 points
+- **Barns** 🏠: 50 points
+
+**Strategy Tips:**
+- Account for wind when aiming (shown in top-left)
+- Small turkeys are harder to hit but worth more points
+- Flying turkeys move in 2D, walking turkeys only move left/right
+- Barns are stationary but positioned randomly each game
+- Score carries over between levels
+
+## Customization
+
+### Adjust Gameplay Physics
+Edit the `CONFIG` object at the top of `game.js`:
+
+```javascript
+const CONFIG = {
+    minAngle: 10,        // Minimum launch angle (degrees)
+    maxAngle: 80,        // Maximum launch angle (degrees)
+    minPower: 5,         // Minimum launch power
+    maxPower: 25,        // Maximum launch power
+    gravity: 0.3,        // Gravity strength
+    targetDistance: 400  // Reference distance
+};
+```
+
+### Add Custom Background
+Place a `background.png` image in the `assets/` folder to replace the default sky/ground background.
+
+### Modify Level Difficulty
+In the `generateRandomTargets()` function, adjust:
+- Target counts per level
+- Speed factor multiplier (currently 1.2x per level)
+- Target placement ranges
 
 ## File Structure
 ```
 pumpkin-catapult/
 ├── index.html          # Main game page
-├── game.js             # Game logic and physics (edit for Tasks 3 & 4)
-└── assets/             # Place your images here (Tasks 1 & 2)
-    ├── pumpkin.png     # Projectile sprite
-    ├── turkey.png      # Target sprite
-    └── barn.png        # Target sprite
+├── game.js             # Game logic, physics, and levels
+├── README.md           # This file
+└── assets/             # Game assets
+    ├── background.png  # Background image (optional)
+    ├── pumpkin.png     # Projectile sprite (falls back to emoji)
+    ├── turkey.png      # Target sprite (falls back to emoji)
+    └── barn.png        # Target sprite (falls back to emoji)
 ```
 
+**Note:** The game uses emoji fallbacks (🎃🦃🏠) if images are not found, so images are optional.
+
+## Technical Details
+
+### Features Implemented
+- ✅ Restart functionality (R key)
+- ✅ Random target positioning with platforms
+- ✅ Moving targets (flying and walking)
+- ✅ Wind system affecting projectiles
+- ✅ 3-level progression system
+- ✅ Variable turkey sizes with different point values
+- ✅ Floating score indicators
+- ✅ Explosion particle effects on barn hits
+- ✅ Falling turkey animations
+- ✅ Direction-based turkey sprite flipping
+- ✅ Custom background image support
+- ✅ Limited projectiles per level (15)
+- ✅ Level completion and game over screens
+
+### Physics System
+- Gravity-based projectile motion
+- Wind affecting horizontal velocity
+- Collision detection with variable-sized targets
+- Boundary checking for moving targets
+
 ## Troubleshooting
-- **Images not showing?** Check the browser console (F12) for errors
 - **Game won't start?** Ensure you're using a local web server, not opening file directly
 - **Physics feels wrong?** Adjust gravity and power values in CONFIG
-- **Targets too hard to hit?** Increase collision detection radius or increase maxPower
+- **Targets too hard to hit?** Increase collision detection radius in `updateProjectile()` function
+- **Targets moving too fast/slow?** Adjust the `speedFactor` multiplier in `generateRandomTargets()`
+- **Wind too strong?** Modify wind range in `restartGame()` function (currently -0.3 to 0.3)
 
-## Bonus Challenges (Optional)
-- Add a third target (haystack, cornucopia, pie, etc.)
-- Add sound effects for launch and hit
-- Add a trail effect behind the flying pumpkin
-- Create a wind system that affects projectile flight
-- Add different difficulty levels
-- Track high scores using localStorage
+## Credits
+Built with [p5.js](https://p5js.org/) - A JavaScript library for creative coding
 
 Have fun launching pumpkins! 🎃🦃
