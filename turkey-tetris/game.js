@@ -40,9 +40,9 @@ function loadTextures() {
 
 // Sound effects (students will replace these)
 const sounds = {
-    lineClear: new Audio('sounds/line_clear.wav'),
-    gameOver: new Audio('sounds/game_over.wav'),
-    move: new Audio('sounds/move.wav')
+    lineClear: new Audio('sounds/alert.mp3'),
+    gameOver: new Audio('sounds/sad.mp3'),
+    move: new Audio('sounds/swoosh.mp3')
 };
 
 // Handle missing sounds gracefully
@@ -143,6 +143,8 @@ function clearLines() {
         scoreElement.textContent = 'Score: ' + score;
         
         // STUDENT TODO: Play "Gobble gobble!" sound here
+         const gobbleSound = new Audio('sounds/gobble.mp3');
+        gobbleSound.play();
         try {
             sounds.lineClear.play();
         } catch (e) {}
