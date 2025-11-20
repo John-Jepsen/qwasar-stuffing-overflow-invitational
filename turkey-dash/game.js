@@ -15,8 +15,11 @@ const turkey = {
     y: 0,
     width: 50,
     height: 50,
+    standing_height: 50,
+    crouching_height: 25,
     velocityY: 0,
     grounded: false,
+    crouching: false,
     image: null
 };
 
@@ -146,6 +149,7 @@ function drawObstacles() {
 // Update turkey physics
 function updateTurkey() {
     // Apply gravity
+    console.log(turkey.crouching)
     if (!turkey.grounded) {
         turkey.velocityY += CONFIG.gravity;
     }
@@ -165,12 +169,15 @@ function updateTurkey() {
 
 // Spawn obstacles
 function spawnObstacle() {
+    heights = [0, 40, 80];
+
     if (frameCount >= nextObstacleFrame) {
         const obstacleTemplate = OBSTACLES[Math.floor(Math.random() * OBSTACLES.length)];
         
+        const randomHeight = heights[Math.floor(Math.random() * heights.length)];
         const obstacle = {
             x: canvas.width,
-            y: groundY - obstacleTemplate.height,
+            y: groundY - obstacleTemplate.height - randomHeight,
             width: obstacleTemplate.width,
             height: obstacleTemplate.height,
             type: obstacleTemplate.type,
@@ -265,7 +272,7 @@ function jump() {
 
 // Keyboard controls
 document.addEventListener('keydown', (e) => {
-    if (e.code === 'Space') {
+    if (e.code === 'KeyW') {
         e.preventDefault();
         
         if (!gameRunning) {
@@ -274,6 +281,21 @@ document.addEventListener('keydown', (e) => {
         } else {
             jump();
         }
+    }
+    if (e.code === 'KeyS') {
+        turkey.crouching = true;
+        turkey.height = turkey.crouching_height;
+        turkey.y += turkey.crouching_height;
+        console.log("Crouch!");
+    }
+});
+
+document.addEventListener('keyup', (e) => {
+    if (e.code === 'KeyS' && turkey.crouching) {
+        turkey.y -= turkey.crouching_height;
+        turkey.height = turkey.standing_height;
+        turkey.crouching = false;
+        console.log(turkey.height);
     }
 });
 
