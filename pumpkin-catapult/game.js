@@ -2,19 +2,24 @@
 const CONFIG = {
     minAngle: 10,        // Minimum launch angle (degrees)
     maxAngle: 80,        // Maximum launch angle (degrees)
-    minPower: 5,         // Minimum launch power
-    maxPower: 25,        // Maximum launch power
-    gravity: 0.3,        // Gravity strength
-    targetDistance: 400  // Distance to target
+    laserSpeed: 25,      // Laser projectile speed
+    // Turkey flight parameters
+    turkeyMinY: 80,              // Top sky boundary
+    turkeyMaxY: 350,             // Bottom sky boundary
+    turkeyMinX: 150,             // Left boundary
+    turkeyMaxX: 750,             // Right boundary
+    turkeyImpulseMin: 30,        // Min frames between direction changes
+    turkeyImpulseMax: 100,       // Max frames between direction changes
+    turkeyMaxSpeed: 4,           // Maximum flight speed
+    turkeyDrag: 0.98             // Velocity dampening (0.98 = 2% slowdown per frame)
 };
 
 let angle = 45;
-let power = 15;
-let projectile = null;
+let projectiles = [];    // Array of active lasers
 let targets = [];
 let score = 0;
-let launches = 0;
-let gameState = 'aiming'; // 'aiming' or 'flying'
+let shots = 0;
+let shootCooldown = 0;   // Frames until next shot allowed
 
 // Projectile and target images (students will replace these)
 let pumpkinImg;
@@ -44,10 +49,21 @@ function preload() {
 
 function setup() {
     createCanvas(800, 600);
-    
-    // Create targets at different distances
+
+    // Create targets - turkey flies in the sky
     targets = [
-        { x: 400, y: height - 100, w: 60, h: 80, type: 'turkey', hit: false },
+        {
+            x: 400,
+            y: 200,
+            w: 60,
+            h: 80,
+            type: 'turkey',
+            hit: false,
+            // Erratic flight properties
+            vx: random(-2, 2),                  // Horizontal velocity
+            vy: random(-2, 2),                  // Vertical velocity
+            impulseTimer: random(CONFIG.turkeyImpulseMin, CONFIG.turkeyImpulseMax) // Frames until next direction change
+        },
         { x: 550, y: height - 120, w: 100, h: 100, type: 'barn', hit: false }
     ];
 }
@@ -55,59 +71,110 @@ function setup() {
 function draw() {
     // Sky and ground
     background(135, 206, 235);
-    
+
     // Ground
     fill(101, 67, 33);
     rect(0, height - 80, width, 80);
     fill(34, 139, 34);
     rect(0, height - 90, width, 10);
-    
-    // Draw catapult base
-    drawCatapult();
-    
+
+    // Handle continuous key input
+    handleContinuousInput();
+
+    // Draw shooter character
+    drawShooter();
+
+    // Update target positions (turkey flying)
+    updateTargets();
+
     // Draw targets
     drawTargets();
-    
-    // Update and draw projectile
-    if (gameState === 'flying' && projectile) {
-        updateProjectile();
-        drawProjectile();
-    }
-    
+
+    // Update and draw all projectiles (lasers)
+    updateProjectiles();
+    drawProjectiles();
+
     // Draw UI
     drawUI();
-    
+
     // Instructions
-    if (gameState === 'aiming') {
-        fill(255);
-        stroke(0);
-        strokeWeight(3);
-        textAlign(CENTER);
-        textSize(18);
-        text('SPACE to launch | UP/DOWN for angle | LEFT/RIGHT for power', width/2, 40);
+    fill(255);
+    stroke(0);
+    strokeWeight(3);
+    textAlign(CENTER);
+    textSize(18);
+    text('Hold SPACE to rapid-fire | Hold UP/DOWN to aim', width/2, 40);
+}
+
+function handleContinuousInput() {
+    // Decrement shoot cooldown
+    if (shootCooldown > 0) {
+        shootCooldown--;
+    }
+
+    // Continuous angle adjustment (works in any state)
+    if (keyIsDown(UP_ARROW)) {
+        angle = constrain(angle + 2, CONFIG.minAngle, CONFIG.maxAngle);
+    }
+    if (keyIsDown(DOWN_ARROW)) {
+        angle = constrain(angle - 2, CONFIG.minAngle, CONFIG.maxAngle);
+    }
+
+    // Continuous shooting with cooldown (10 frames = ~6 shots/second at 60fps)
+    // Allow shooting even while previous laser is in flight
+    if (keyIsDown(32) && shootCooldown === 0) { // 32 is spacebar
+        shootLaser();
+        shootCooldown = 10; // Cooldown between shots
     }
 }
 
-function drawCatapult() {
+function drawShooter() {
     push();
     translate(100, height - 90);
-    
-    // Base
-    fill(101, 67, 33);
-    rect(-30, 0, 60, 40);
-    
-    // Arm
+
+    // Person's body (simple stick figure)
+    stroke(50);
+    strokeWeight(4);
+    fill(100, 150, 200); // Blue shirt
+
+    // Head
+    fill(255, 220, 177); // Skin tone
+    ellipse(0, -60, 25, 25);
+
+    // Body
+    stroke(100, 150, 200);
+    strokeWeight(6);
+    line(0, -48, 0, -10);
+
+    // Legs
+    line(0, -10, -10, 20);
+    line(0, -10, 10, 20);
+
+    // Arms and laser gun
     push();
     rotate(-radians(angle));
-    stroke(101, 67, 33);
-    strokeWeight(8);
-    line(0, 0, 0, -80);
-    
-    // Bucket
-    fill(139, 69, 19);
-    ellipse(0, -80, 20, 20);
+
+    // Arm holding gun
+    stroke(255, 220, 177);
+    strokeWeight(4);
+    line(0, -40, 0, -70);
+
+    // Laser gun
+    fill(70, 70, 70);
+    stroke(40);
+    strokeWeight(2);
+    rect(-5, -80, 10, 20);
+
+    // Gun barrel
+    fill(50);
+    rect(-3, -85, 6, 10);
+
+    // Glowing tip
+    fill(0, 255, 0);
+    noStroke();
+    ellipse(0, -85, 6, 6);
+
     pop();
-    
     pop();
 }
 
@@ -153,52 +220,120 @@ function drawTargets() {
     }
 }
 
-function drawProjectile() {
-    if (!projectile) return;
-    
-    push();
-    
-    if (pumpkinImg && pumpkinImg.width > 0) {
-        imageMode(CENTER);
-        image(pumpkinImg, projectile.x, projectile.y, 40, 40);
-    } else {
-        // Fallback: orange circle
-        fill(255, 140, 0);
-        stroke(255, 100, 0);
-        strokeWeight(2);
-        ellipse(projectile.x, projectile.y, 30, 30);
+function drawProjectiles() {
+    for (let projectile of projectiles) {
+        push();
+
+        // Draw laser beam with glow effect
+        // Outer glow
+        stroke(0, 255, 0, 80);
+        strokeWeight(12);
+        line(projectile.x, projectile.y, projectile.x - projectile.vx * 2, projectile.y - projectile.vy * 2);
+
+        // Middle glow
+        stroke(0, 255, 0, 150);
+        strokeWeight(6);
+        line(projectile.x, projectile.y, projectile.x - projectile.vx * 2, projectile.y - projectile.vy * 2);
+
+        // Core beam
+        stroke(150, 255, 150);
+        strokeWeight(3);
+        line(projectile.x, projectile.y, projectile.x - projectile.vx * 2, projectile.y - projectile.vy * 2);
+
+        // Leading bright point
+        fill(255, 255, 255);
+        noStroke();
+        ellipse(projectile.x, projectile.y, 8, 8);
+
+        pop();
     }
-    
-    pop();
 }
 
-function updateProjectile() {
-    if (!projectile) return;
-    
-    // Apply gravity
-    projectile.vy += CONFIG.gravity;
-    
-    // Update position
-    projectile.x += projectile.vx;
-    projectile.y += projectile.vy;
-    
-    // Check collision with targets
-    for (let target of targets) {
-        if (target.hit) continue;
-        
-        if (abs(projectile.x - target.x) < target.w/2 + 15 &&
-            abs(projectile.y - target.y) < target.h/2 + 15) {
-            target.hit = true;
-            score += 100;
-            console.log('Hit!');
+function updateProjectiles() {
+    // Update all projectiles and remove off-screen ones
+    for (let i = projectiles.length - 1; i >= 0; i--) {
+        let projectile = projectiles[i];
+
+        // Laser travels in straight line (no gravity)
+        projectile.x += projectile.vx;
+        projectile.y += projectile.vy;
+
+        // Check collision with targets
+        let hitTarget = false;
+        for (let target of targets) {
+            if (target.hit) continue;
+
+            if (abs(projectile.x - target.x) < target.w/2 + 15 &&
+                abs(projectile.y - target.y) < target.h/2 + 15) {
+                target.hit = true;
+                score += 100;
+                console.log('Hit!');
+                hitTarget = true;
+                break;
+            }
+        }
+
+        // Remove laser if it hit a target or went off screen
+        if (hitTarget || projectile.y < 0 || projectile.y > height || projectile.x > width || projectile.x < 0) {
+            projectiles.splice(i, 1);
         }
     }
-    
-    // Check if projectile is off screen or hit ground
-    if (projectile.y > height - 90 || projectile.x > width || projectile.x < 0) {
-        gameState = 'aiming';
-        projectile = null;
-        launches++;
+}
+
+function updateTargets() {
+    for (let target of targets) {
+        // Skip non-turkeys and hit targets
+        if (target.type !== 'turkey' || target.hit) continue;
+
+        // ERRATIC ZIGZAG FLIGHT BEHAVIOR
+
+        // Apply drag (gradual slowdown)
+        target.vx *= CONFIG.turkeyDrag;
+        target.vy *= CONFIG.turkeyDrag;
+
+        // Add small random jitter each frame for erratic movement
+        target.vx += random(-0.3, 0.3);
+        target.vy += random(-0.3, 0.3);
+
+        // Countdown to next impulse (sudden direction change)
+        target.impulseTimer--;
+
+        if (target.impulseTimer <= 0) {
+            // Apply random impulse for sudden direction change
+            target.vx += random(-3, 3);
+            target.vy += random(-3, 3);
+
+            // Reset impulse timer
+            target.impulseTimer = random(CONFIG.turkeyImpulseMin, CONFIG.turkeyImpulseMax);
+        }
+
+        // Clamp velocity to max speed
+        let speed = sqrt(target.vx * target.vx + target.vy * target.vy);
+        if (speed > CONFIG.turkeyMaxSpeed) {
+            target.vx = (target.vx / speed) * CONFIG.turkeyMaxSpeed;
+            target.vy = (target.vy / speed) * CONFIG.turkeyMaxSpeed;
+        }
+
+        // Update position
+        target.x += target.vx;
+        target.y += target.vy;
+
+        // Bounce off boundaries (reverses direction)
+        if (target.x < CONFIG.turkeyMinX) {
+            target.x = CONFIG.turkeyMinX;
+            target.vx = abs(target.vx); // Force rightward
+        } else if (target.x > CONFIG.turkeyMaxX) {
+            target.x = CONFIG.turkeyMaxX;
+            target.vx = -abs(target.vx); // Force leftward
+        }
+
+        if (target.y < CONFIG.turkeyMinY) {
+            target.y = CONFIG.turkeyMinY;
+            target.vy = abs(target.vy); // Force downward
+        } else if (target.y > CONFIG.turkeyMaxY) {
+            target.y = CONFIG.turkeyMaxY;
+            target.vy = -abs(target.vy); // Force upward
+        }
     }
 }
 
@@ -210,13 +345,9 @@ function drawUI() {
     textAlign(LEFT);
     textSize(20);
     text(`Score: ${score}`, 20, 30);
-    text(`Launches: ${launches}`, 20, 60);
-    
-    if (gameState === 'aiming') {
-        text(`Angle: ${angle}°`, 20, 90);
-        text(`Power: ${power}`, 20, 120);
-    }
-    
+    text(`Shots: ${shots}`, 20, 60);
+    text(`Angle: ${angle}°`, 20, 90);
+
     // Check if all targets hit
     if (targets.every(t => t.hit)) {
         fill(255, 215, 0);
@@ -226,43 +357,27 @@ function drawUI() {
         textSize(48);
         text('🎉 ALL TARGETS HIT! 🎉', width/2, height/2);
         textSize(24);
-        text(`Score: ${score} | Launches: ${launches}`, width/2, height/2 + 50);
+        text(`Score: ${score} | Shots: ${shots}`, width/2, height/2 + 50);
         text('Refresh to play again!', width/2, height/2 + 90);
     }
 }
 
-function launchProjectile() {
+function shootLaser() {
     const launchAngle = radians(angle);
-    
-    projectile = {
+
+    // Add new laser to the array
+    projectiles.push({
         x: 100,
         y: height - 90,
-        vx: cos(-launchAngle) * power,
-        vy: sin(-launchAngle) * power
-    };
-    
-    gameState = 'flying';
+        vx: cos(-launchAngle) * CONFIG.laserSpeed,
+        vy: sin(-launchAngle) * CONFIG.laserSpeed
+    });
+
+    shots++;
 }
 
 function keyPressed() {
-    if (gameState === 'aiming') {
-        // Adjust angle
-        if (keyCode === UP_ARROW) {
-            angle = constrain(angle + 2, CONFIG.minAngle, CONFIG.maxAngle);
-        } else if (keyCode === DOWN_ARROW) {
-            angle = constrain(angle - 2, CONFIG.minAngle, CONFIG.maxAngle);
-        }
-        
-        // Adjust power
-        if (keyCode === RIGHT_ARROW) {
-            power = constrain(power + 0.5, CONFIG.minPower, CONFIG.maxPower);
-        } else if (keyCode === LEFT_ARROW) {
-            power = constrain(power - 0.5, CONFIG.minPower, CONFIG.maxPower);
-        }
-        
-        // Launch
-        if (key === ' ') {
-            launchProjectile();
-        }
-    }
+    // Key handling now done in handleContinuousInput() for smooth continuous input
+    // This function is kept for compatibility but is no longer the primary input method
+    return false; // Prevent default browser behavior
 }
