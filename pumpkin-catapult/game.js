@@ -82,9 +82,21 @@ function setup() {
 }
 
 function draw() {
-    // Sky and ground
-    background(135, 206, 235);
-    
+    // Space background (dark blue to black gradient)
+    for (let i = 0; i < height - 80; i++) {
+        let inter = map(i, 0, height - 80, 0, 1);
+        let c = lerpColor(color(10, 10, 40), color(0, 0, 0), inter);
+        stroke(c);
+        line(0, i, width, i);
+    }
+
+    // Draw stars
+    noStroke();
+    for (let star of stars) {
+        fill(255, 255, 255, star.brightness);
+        ellipse(star.x, star.y, star.size, star.size);
+    }
+
     // Ground
     fill(101, 67, 33);
     rect(0, height - 80, width, 80);
