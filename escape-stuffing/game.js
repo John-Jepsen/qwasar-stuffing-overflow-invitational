@@ -295,23 +295,23 @@ function keyPressed() {
     
     let moved = false;
     
-    // STUDENT TODO: Confirm arrow key controls work
-    if (keyCode === UP_ARROW) {
+    // Arrow keys and WASD controls
+    if (keyCode === UP_ARROW || key === 'w' || key === 'W') {
         if (maze.canMove(player.row, player.col, 'up')) {
             player.row--;
             moved = true;
         }
-    } else if (keyCode === DOWN_ARROW) {
+    } else if (keyCode === DOWN_ARROW || key === 's' || key === 'S') {
         if (maze.canMove(player.row, player.col, 'down')) {
             player.row++;
             moved = true;
         }
-    } else if (keyCode === LEFT_ARROW) {
+    } else if (keyCode === LEFT_ARROW || key === 'a' || key === 'A') {
         if (maze.canMove(player.row, player.col, 'left')) {
             player.col--;
             moved = true;
         }
-    } else if (keyCode === RIGHT_ARROW) {
+    } else if (keyCode === RIGHT_ARROW || key === 'd' || key === 'D') {
         if (maze.canMove(player.row, player.col, 'right')) {
             player.col++;
             moved = true;
