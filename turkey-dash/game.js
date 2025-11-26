@@ -2,6 +2,7 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const scoreElement = document.getElementById('score');
 const gameOverElement = document.getElementById('gameOver');
+const statusElement = document.getElementById('status');
 
 // Game state
 let gameRunning = false;
@@ -15,8 +16,10 @@ const turkey = {
     y: 0,
     width: 50,
     height: 50,
+    standingHeight: 50,
     velocityY: 0,
     grounded: false,
+    crouching: false,
     image: null
 };
 
@@ -24,9 +27,38 @@ const turkey = {
 const groundY = canvas.height - 80;
 turkey.y = groundY - turkey.height;
 
-// Obstacles array
+// Obstacles and power-ups
 let obstacles = [];
+let powerUps = [];
 let nextObstacleFrame = CONFIG.obstacleFrequency;
+let nextPowerUpFrame = CONFIG.powerUpFrequency.min;
+
+const state = {
+    invincibleUntil: 0,
+    slowUntil: 0,
+    dashUntil: 0,
+    dashCooldownUntil: 0,
+    jumpsLeft: CONFIG.maxAirJumps
+};
+
+function randomInRange(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function updateStatusLabel(message) {
+    if (!statusElement) return;
+    if (message) {
+        statusElement.textContent = message;
+        return;
+    }
+    const effects = [];
+    if (state.invincibleUntil > frameCount) effects.push('shield');
+    if (state.dashUntil > frameCount) effects.push('dash');
+    if (state.slowUntil > frameCount) effects.push('slow-mo');
+    statusElement.textContent = effects.length
+        ? `Power: ${effects.join(' | ')}`
+        : 'Grab glowing orbs for power-ups!';
+}
 
 // Load images
 function loadImages() {
@@ -49,6 +81,16 @@ function loadImages() {
     });
 }
 
+function resetState() {
+    state.invincibleUntil = 0;
+    state.slowUntil = 0;
+    state.dashUntil = 0;
+    state.dashCooldownUntil = 0;
+    state.jumpsLeft = CONFIG.maxAirJumps;
+    turkey.crouching = false;
+    turkey.height = turkey.standingHeight;
+}
+
 // Initialize game
 function init() {
     gameRunning = true;
@@ -56,11 +98,40 @@ function init() {
     frameCount = 0;
     currentSpeed = CONFIG.gameSpeed;
     obstacles = [];
+    powerUps = [];
     turkey.y = groundY - turkey.height;
     turkey.velocityY = 0;
     turkey.grounded = true;
     gameOverElement.style.display = 'none';
     nextObstacleFrame = CONFIG.obstacleFrequency;
+    nextPowerUpFrame = CONFIG.powerUpFrequency.min;
+    resetState();
+    updateStatusLabel('Run! Power-ups ahead.');
+}
+
+function getEffectiveSpeed() {
+    let speed = currentSpeed;
+    if (state.slowUntil > frameCount) {
+        speed *= CONFIG.slowMoFactor;
+    }
+    if (state.dashUntil > frameCount) {
+        speed *= CONFIG.dashSpeedBoost;
+    }
+    return speed;
+}
+
+function setCrouch(isCrouching) {
+    if (isCrouching && !turkey.crouching) {
+        turkey.crouching = true;
+        const delta = turkey.height - CONFIG.crouchHeight;
+        turkey.height = CONFIG.crouchHeight;
+        turkey.y += delta;
+    } else if (!isCrouching && turkey.crouching) {
+        const delta = turkey.standingHeight - turkey.height;
+        turkey.height = turkey.standingHeight;
+        turkey.y -= delta;
+        turkey.crouching = false;
+    }
 }
 
 // Draw turkey
@@ -117,13 +188,11 @@ function drawObstacles() {
             ctx.fillStyle = obstacleData.color;
             
             if (obs.type === 'gravy') {
-                // Puddle shape
                 ctx.beginPath();
                 ctx.ellipse(obs.x + obs.width/2, obs.y + obs.height/2, 
                            obs.width/2, obs.height/2, 0, 0, Math.PI * 2);
                 ctx.fill();
             } else if (obs.type === 'pumpkin') {
-                // Circle pumpkin
                 ctx.beginPath();
                 ctx.arc(obs.x + obs.width/2, obs.y + obs.height/2, 
                        obs.width/2, 0, Math.PI * 2);
@@ -131,15 +200,42 @@ function drawObstacles() {
                 ctx.fillStyle = '#000';
                 ctx.fillRect(obs.x + obs.width/2 - 3, obs.y + 5, 6, 8);
             } else if (obs.type === 'pie') {
-                // Triangle pie slice
                 ctx.beginPath();
                 ctx.moveTo(obs.x + obs.width/2, obs.y);
                 ctx.lineTo(obs.x, obs.y + obs.height);
                 ctx.lineTo(obs.x + obs.width, obs.y + obs.height);
                 ctx.closePath();
                 ctx.fill();
+            } else {
+                // Leaf or unknown: simple rounded rect
+                ctx.beginPath();
+                const radius = 6;
+                ctx.moveTo(obs.x + radius, obs.y);
+                ctx.lineTo(obs.x + obs.width - radius, obs.y);
+                ctx.quadraticCurveTo(obs.x + obs.width, obs.y, obs.x + obs.width, obs.y + radius);
+                ctx.lineTo(obs.x + obs.width, obs.y + obs.height - radius);
+                ctx.quadraticCurveTo(obs.x + obs.width, obs.y + obs.height, obs.x + obs.width - radius, obs.y + obs.height);
+                ctx.lineTo(obs.x + radius, obs.y + obs.height);
+                ctx.quadraticCurveTo(obs.x, obs.y + obs.height, obs.x, obs.y + obs.height - radius);
+                ctx.lineTo(obs.x, obs.y + radius);
+                ctx.quadraticCurveTo(obs.x, obs.y, obs.x + radius, obs.y);
+                ctx.fill();
             }
         }
+    });
+}
+
+function drawPowerUps() {
+    powerUps.forEach(pu => {
+        ctx.fillStyle = pu.color;
+        ctx.beginPath();
+        ctx.arc(pu.x + pu.size / 2, pu.y + pu.size / 2, pu.size / 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Glow outline
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
     });
 }
 
@@ -158,6 +254,7 @@ function updateTurkey() {
         turkey.y = groundY - turkey.height;
         turkey.velocityY = 0;
         turkey.grounded = true;
+        state.jumpsLeft = CONFIG.maxAirJumps;
     } else {
         turkey.grounded = false;
     }
@@ -168,9 +265,12 @@ function spawnObstacle() {
     if (frameCount >= nextObstacleFrame) {
         const obstacleTemplate = OBSTACLES[Math.floor(Math.random() * OBSTACLES.length)];
         
+        const randomHeight = obstacleTemplate.floating
+            ? randomInRange(40, 140)
+            : CONFIG.obstacleHeights[Math.floor(Math.random() * CONFIG.obstacleHeights.length)];
         const obstacle = {
             x: canvas.width,
-            y: groundY - obstacleTemplate.height,
+            y: Math.max(20, groundY - obstacleTemplate.height - randomHeight),
             width: obstacleTemplate.width,
             height: obstacleTemplate.height,
             type: obstacleTemplate.type,
@@ -181,15 +281,16 @@ function spawnObstacle() {
         obstacles.push(obstacle);
         nextObstacleFrame = frameCount + Math.max(
             CONFIG.minObstacleGap,
-            CONFIG.obstacleFrequency - Math.floor(score / 500)
+            CONFIG.obstacleFrequency - Math.floor(score / 400)
         );
     }
 }
 
 // Update obstacles
 function updateObstacles() {
+    const speed = getEffectiveSpeed();
     obstacles.forEach(obs => {
-        obs.x -= currentSpeed;
+        obs.x -= speed;
         
         // Award points for passing obstacle
         if (!obs.passed && obs.x + obs.width < turkey.x) {
@@ -202,8 +303,73 @@ function updateObstacles() {
     obstacles = obstacles.filter(obs => obs.x + obs.width > 0);
 }
 
+function spawnPowerUp() {
+    if (frameCount < nextPowerUpFrame) return;
+    const types = [
+        { type: 'shield', color: '#4DB6FF' },
+        { type: 'slow', color: '#FFD54F' },
+        { type: 'feast', color: '#ADFF2F' }
+    ];
+    const pick = types[Math.floor(Math.random() * types.length)];
+    const size = 26;
+    const heightOffset = randomInRange(30, 140);
+    const powerUp = {
+        ...pick,
+        x: canvas.width,
+        y: Math.max(20, groundY - heightOffset),
+        size
+    };
+    powerUps.push(powerUp);
+    nextPowerUpFrame = frameCount + randomInRange(CONFIG.powerUpFrequency.min, CONFIG.powerUpFrequency.max);
+}
+
+function updatePowerUps() {
+    const speed = getEffectiveSpeed() * 0.85;
+    powerUps.forEach(pu => {
+        pu.x -= speed;
+    });
+    powerUps = powerUps.filter(pu => pu.x + pu.size > 0);
+}
+
+function applyPowerUp(type) {
+    if (type === 'shield') {
+        state.invincibleUntil = frameCount + CONFIG.invincibleFrames;
+        updateStatusLabel('Shield up!');
+    } else if (type === 'slow') {
+        state.slowUntil = frameCount + CONFIG.slowMoFrames;
+        updateStatusLabel('Slow-mo!');
+    } else if (type === 'feast') {
+        score += CONFIG.powerUpBonus;
+        state.jumpsLeft = CONFIG.maxAirJumps;
+        updateStatusLabel('Feast bonus!');
+    }
+}
+
+function collectPowerUps() {
+    powerUps = powerUps.filter(pu => {
+        const collides = turkey.x < pu.x + pu.size &&
+            turkey.x + turkey.width > pu.x &&
+            turkey.y < pu.y + pu.size &&
+            turkey.y + turkey.height > pu.y;
+        if (collides) {
+            applyPowerUp(pu.type);
+        }
+        return !collides;
+    });
+}
+
+function startDash() {
+    if (!gameRunning) return;
+    if (frameCount < state.dashCooldownUntil) return;
+    state.dashUntil = frameCount + CONFIG.dashFrames;
+    state.invincibleUntil = Math.max(state.invincibleUntil, frameCount + CONFIG.dashFrames);
+    state.dashCooldownUntil = frameCount + CONFIG.dashCooldown;
+    updateStatusLabel('Dash burst!');
+}
+
 // Check collisions
 function checkCollisions() {
+    if (state.invincibleUntil > frameCount) return false;
     for (let obs of obstacles) {
         if (turkey.x < obs.x + obs.width &&
             turkey.x + turkey.width > obs.x &&
@@ -219,6 +385,24 @@ function checkCollisions() {
 function gameOver() {
     gameRunning = false;
     gameOverElement.style.display = 'block';
+    updateStatusLabel('Press Space/W/Up to try again');
+}
+
+function drawSky() {
+    ctx.fillStyle = '#B3E5FC';
+    ctx.fillRect(0, 0, canvas.width, groundY);
+    
+    // Simple parallax clouds
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    for (let i = 0; i < 4; i++) {
+        const offset = (frameCount * 0.2 + i * 200) % (canvas.width + 200);
+        const x = canvas.width - offset;
+        const y = 40 + (i % 2) * 30;
+        ctx.beginPath();
+        ctx.ellipse(x, y, 50, 20, 0, 0, Math.PI * 2);
+        ctx.ellipse(x + 25, y + 5, 40, 20, 0, 0, Math.PI * 2);
+        ctx.fill();
+    }
 }
 
 // Game loop
@@ -232,14 +416,18 @@ function gameLoop() {
     frameCount++;
     updateTurkey();
     spawnObstacle();
+    spawnPowerUp();
     updateObstacles();
+    updatePowerUps();
+    collectPowerUps();
     
     // Increase speed over time
     currentSpeed += CONFIG.speedIncrease;
     
-    // Update score (STUDENT TODO: Confirm score increases)
+    // Update score
     score += CONFIG.scoreIncrement;
     scoreElement.textContent = 'Score: ' + Math.floor(score);
+    updateStatusLabel();
     
     // Check collisions
     if (checkCollisions()) {
@@ -248,7 +436,9 @@ function gameLoop() {
     }
     
     // Draw
+    drawSky();
     drawGround();
+    drawPowerUps();
     drawObstacles();
     drawTurkey();
     
@@ -257,15 +447,20 @@ function gameLoop() {
 
 // Jump control
 function jump() {
-    if (turkey.grounded && gameRunning) {
+    if (!gameRunning) return;
+    if (turkey.grounded || state.jumpsLeft > 0) {
         turkey.velocityY = CONFIG.jumpStrength;
+        if (!turkey.grounded) {
+            state.jumpsLeft -= 1;
+        }
         turkey.grounded = false;
+        setCrouch(false);
     }
 }
 
 // Keyboard controls
 document.addEventListener('keydown', (e) => {
-    if (e.code === 'Space') {
+    if (['Space', 'KeyW', 'ArrowUp'].includes(e.code)) {
         e.preventDefault();
         
         if (!gameRunning) {
@@ -275,6 +470,18 @@ document.addEventListener('keydown', (e) => {
             jump();
         }
     }
+    if (['KeyS', 'ArrowDown'].includes(e.code)) {
+        setCrouch(true);
+    }
+    if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+        startDash();
+    }
+});
+
+document.addEventListener('keyup', (e) => {
+    if (['KeyS', 'ArrowDown'].includes(e.code)) {
+        setCrouch(false);
+    }
 });
 
 // Start game
@@ -282,4 +489,5 @@ loadImages();
 setTimeout(() => {
     // Give images time to load
     scoreElement.textContent = 'Press SPACEBAR to start!';
+    updateStatusLabel('Space/W/Up = jump (double). S/Down = slide. Shift = dash.');
 }, 100);

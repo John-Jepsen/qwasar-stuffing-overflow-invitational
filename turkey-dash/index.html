@@ -60,6 +60,13 @@
             color: #666;
             font-size: 14px;
         }
+        
+        #status {
+            margin-top: 6px;
+            color: #444;
+            font-size: 14px;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -68,7 +75,8 @@
         <div id="score">Score: 0</div>
         <canvas id="gameCanvas" width="800" height="400"></canvas>
         <div id="gameOver">Game Over! Press SPACE to restart</div>
-        <div id="instructions">Press SPACEBAR to jump | Avoid obstacles!</div>
+        <div id="instructions">Space / W / ↑ to jump (double jump) · S / ↓ to slide · Shift to dash · Grab glowing orbs for power-ups</div>
+        <div id="status">Space/W/↑ = jump (double). S/↓ = slide. Shift = dash.</div>
     </div>
     
     <script src="config.js"></script>
