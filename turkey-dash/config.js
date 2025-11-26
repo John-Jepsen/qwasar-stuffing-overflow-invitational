@@ -7,9 +7,9 @@ const CONFIG = {
     crouchHeight: 28,       // Height while sliding/crouching
     
     // Game speed
-    gameSpeed: 6,           // How fast obstacles move (higher = faster game)
-    speedIncrease: 0.001,   // How much speed increases over time
-    dashSpeedBoost: 1.6,    // Speed multiplier during dash
+    gameSpeed: 4.5,         // How fast obstacles move (higher = faster game)
+    speedIncrease: 0.0007,  // How much speed increases over time
+    dashSpeedBoost: 1.4,    // Speed multiplier during dash
     dashFrames: 28,         // How long a dash lasts (frames)
     dashCooldown: 160,      // Frames between dashes
     
