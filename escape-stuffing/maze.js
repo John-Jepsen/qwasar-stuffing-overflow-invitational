@@ -3,7 +3,9 @@ const MAZE_CONFIG = {
     rows: 10,           // Maze height in cells (should be 10)
     cols: 10,           // Maze width in cells (should be 10)
     cellSize: 50,       // Size of each cell in pixels
-    timeLimit: 60       // Time limit in seconds
+    timeLimit: 60,       // Time limit in seconds
+    levelCount: 5,
+    levelSizeIncrease: 5
 };
 
 // Maze generation using recursive backtracking

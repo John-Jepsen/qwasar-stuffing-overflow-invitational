@@ -1,13 +1,34 @@
 let maze;
 let player;
-let gameState = 'playing'; // 'playing', 'won', 'lost'
+let gameState = 'playing'; // 'playing', 'won', 'lost', 'escaped'
 let startTime;
 let remainingTime;
-
+let currentLevel = 0;
+let cellSize = MAZE_CONFIG.cellSize;
 // STUDENT TODO: Add turkey sprite image
 let turkeyImg;
+let stuffingTexture;
+let activeDirection = null;
+let lastMoveTime = 0;
+let lastKeyPressTime = 0;
+const HOLD_DELAY = 100;   // ms before repeating starts
+const REPEAT_RATE = 100;  // ms between repeats
 
 function preload() {
+    // Load stuffing background
+    try {
+        stuffingTexture = loadImage('assets/stuffing.png',
+            () => console.log('Stuffing background loaded'),
+            () => { 
+                console.log('Stuffing background not found, using solid color'); 
+                stuffingTexture = null; 
+            }
+        );
+    } catch (e) {
+        console.log('Error loading stuffing background:', e);
+        stuffingTexture = null;
+    }
+
     // Try to load turkey sprite
     try {
         turkeyImg = loadImage('assets/turkey.png',
@@ -24,28 +45,40 @@ function preload() {
 }
 
 function setup() {
+    gameState = "playing"
+    currentLevel = 0;
     let canvas = createCanvas(
         MAZE_CONFIG.cols * MAZE_CONFIG.cellSize + 200,
         MAZE_CONFIG.rows * MAZE_CONFIG.cellSize + 100
     );
     canvas.parent('game-container');
     
+    start_level(0)
+    
+    textFont('Arial');
+}
+
+function start_level(n)
+{
     // Generate maze
-    maze = new Maze(MAZE_CONFIG.rows, MAZE_CONFIG.cols);
+    let rows = MAZE_CONFIG.rows + n * 5;
+    let cols = MAZE_CONFIG.cols + n * 5;
+
+    cellSize = 500 / rows;
+
+    maze = new Maze(rows, cols);
     
     // Initialize player at start (top-left)
     player = {
         row: 0,
         col: 0,
-        targetRow: MAZE_CONFIG.rows - 1,
-        targetCol: MAZE_CONFIG.cols - 1
+        targetRow: rows - 1,
+        targetCol: cols - 1
     };
     
     // Start timer
     startTime = millis();
     remainingTime = MAZE_CONFIG.timeLimit;
-    
-    textFont('Arial');
 }
 
 function draw() {
@@ -60,6 +93,14 @@ function draw() {
             gameState = 'lost';
         }
     }
+
+    // Handle held movement with repeat
+    if (gameState === 'playing') {
+        handleHeldMovement();
+        if (player.row === player.targetRow && player.col === player.targetCol) {
+            gameState = 'won';
+        }
+    }
     
     // Center maze on canvas
     let offsetX = 50;
@@ -67,6 +108,18 @@ function draw() {
     
     push();
     translate(offsetX, offsetY);
+
+    // Draw maze background (single stuffing texture across full maze)
+    let mazeWidth = maze.cols * cellSize;
+    let mazeHeight = maze.rows * cellSize;
+    noStroke();
+    if (stuffingTexture && stuffingTexture.width > 0) {
+        imageMode(CORNER);
+        image(stuffingTexture, 0, 0, mazeWidth, mazeHeight);
+    } else {
+        fill(210, 180, 140);
+        rect(0, 0, mazeWidth, mazeHeight);
+    }
     
     // Draw maze
     drawMaze();
@@ -84,6 +137,19 @@ function draw() {
     
     // Draw game over messages
     if (gameState === 'won') {
+        activeDirection = null; // Stop movement repeat when finishing a level
+        currentLevel += 1;
+        if (currentLevel >= 4)
+        {
+            gameState = 'escaped'
+            drawWinMessage();
+        }
+        else
+        {
+            gameState = 'playing';
+            start_level(currentLevel);
+        }
+    } else if (gameState === 'escaped') {
         drawWinMessage();
     } else if (gameState === 'lost') {
         drawLoseMessage();
@@ -91,114 +157,84 @@ function draw() {
 }
 
 function drawMaze() {
-    stroke(139, 69, 19);
-    strokeWeight(3);
-    
+    // First pass: draw all thick (now dark) wall bases for continuity
+    stroke(100, 50, 10); // Dark brown, thick
+    strokeWeight(7);
     for (let r = 0; r < maze.rows; r++) {
         for (let c = 0; c < maze.cols; c++) {
             let cell = maze.grid[r][c];
-            let x = c * MAZE_CONFIG.cellSize;
-            let y = r * MAZE_CONFIG.cellSize;
-            
-            // STUDENT TODO: Customize maze cell appearance (stuffing texture)
-            // Draw cell background with stuffing-like color
-            noStroke();
-            fill(210, 180, 140); // Tan color for stuffing
-            rect(x, y, MAZE_CONFIG.cellSize, MAZE_CONFIG.cellSize);
-            
-            // Add texture dots to look like stuffing
-            fill(180, 150, 110);
-            for (let i = 0; i < 3; i++) {
-                let dx = random(5, MAZE_CONFIG.cellSize - 5);
-                let dy = random(5, MAZE_CONFIG.cellSize - 5);
-                ellipse(x + dx, y + dy, 3, 3);
-            }
-            
-            // Draw walls
-            stroke(139, 69, 19);
-            strokeWeight(3);
-            
+            let x = c * cellSize;
+            let y = r * cellSize;
             if (cell.walls.top) {
-                line(x, y, x + MAZE_CONFIG.cellSize, y);
+                line(x, y, x + cellSize, y);
             }
             if (cell.walls.right) {
-                line(x + MAZE_CONFIG.cellSize, y, 
-                     x + MAZE_CONFIG.cellSize, y + MAZE_CONFIG.cellSize);
+                line(x + cellSize, y, x + cellSize, y + cellSize);
             }
             if (cell.walls.bottom) {
-                line(x, y + MAZE_CONFIG.cellSize, 
-                     x + MAZE_CONFIG.cellSize, y + MAZE_CONFIG.cellSize);
+                line(x, y + cellSize, x + cellSize, y + cellSize);
             }
             if (cell.walls.left) {
-                line(x, y, x, y + MAZE_CONFIG.cellSize);
+                line(x, y, x, y + cellSize);
+            }
+        }
+    }
+
+    // Second pass: draw all thin (now green) wall tops
+    stroke(190, 210, 170); // Soft green, thin
+    strokeWeight(3);
+    for (let r = 0; r < maze.rows; r++) {
+        for (let c = 0; c < maze.cols; c++) {
+            let cell = maze.grid[r][c];
+            let x = c * cellSize;
+            let y = r * cellSize;
+            if (cell.walls.top) {
+                line(x, y, x + cellSize, y);
+            }
+            if (cell.walls.right) {
+                line(x + cellSize, y, x + cellSize, y + cellSize);
+            }
+            if (cell.walls.bottom) {
+                line(x, y + cellSize, x + cellSize, y + cellSize);
+            }
+            if (cell.walls.left) {
+                line(x, y, x, y + cellSize);
             }
         }
     }
 }
 
 function drawGoal() {
-    let x = player.targetCol * MAZE_CONFIG.cellSize;
-    let y = player.targetRow * MAZE_CONFIG.cellSize;
+    let x = player.targetCol * cellSize;
+    let y = player.targetRow * cellSize;
     
     // Pulsing green goal
     let pulse = sin(millis() / 200) * 20 + 200;
     fill(50, pulse, 50, 150);
     noStroke();
-    rect(x + 5, y + 5, MAZE_CONFIG.cellSize - 10, MAZE_CONFIG.cellSize - 10);
+    rect(x + 5, y + 5, cellSize - 10, cellSize - 10);
     
     // Goal text
     fill(255);
     textAlign(CENTER, CENTER);
     textSize(16);
-    text('EXIT', x + MAZE_CONFIG.cellSize / 2, y + MAZE_CONFIG.cellSize / 2);
+    text('EXIT', x + cellSize / 2, y + cellSize / 2);
 }
 
 function drawPlayer() {
-    let x = player.col * MAZE_CONFIG.cellSize + MAZE_CONFIG.cellSize / 2;
-    let y = player.row * MAZE_CONFIG.cellSize + MAZE_CONFIG.cellSize / 2;
-    let size = MAZE_CONFIG.cellSize * 0.7;
-    
+    let x = player.col * cellSize + cellSize / 2;
+    let y = player.row * cellSize + cellSize / 2;
+    let size = cellSize * 0.7 * 2; // Double the size
+
     if (turkeyImg && turkeyImg.width > 0) {
-        // Draw turkey image
+        // Draw turkey image at 2x size
         imageMode(CENTER);
         image(turkeyImg, x, y, size, size);
-    } else {
-        // Fallback: draw simple turkey
-        noStroke();
-        
-        // Body
-        fill(139, 69, 19);
-        ellipse(x, y, size * 0.8, size * 0.8);
-        
-        // Head
-        fill(160, 82, 45);
-        ellipse(x + size * 0.25, y - size * 0.15, size * 0.4, size * 0.4);
-        
-        // Eye
-        fill(0);
-        ellipse(x + size * 0.3, y - size * 0.15, size * 0.1, size * 0.1);
-        
-        // Beak
-        fill(255, 165, 0);
-        triangle(x + size * 0.4, y - size * 0.15,
-                x + size * 0.5, y - size * 0.1,
-                x + size * 0.4, y - size * 0.1);
-        
-        // Tail feathers
-        fill(165, 42, 42);
-        for (let i = 0; i < 5; i++) {
-            let angle = map(i, 0, 4, -PI/4, PI/4);
-            push();
-            translate(x - size * 0.3, y);
-            rotate(angle);
-            ellipse(-size * 0.2, 0, size * 0.15, size * 0.4);
-            pop();
-        }
     }
 }
 
 function drawHUD(offsetX, offsetY) {
-    let hudY = offsetY + MAZE_CONFIG.rows * MAZE_CONFIG.cellSize + 20;
+    let hudY = offsetY + 500 + 20;
     
     textAlign(LEFT);
     textSize(20);
@@ -211,10 +247,12 @@ function drawHUD(offsetX, offsetY) {
     
     // Position
     fill(51);
-    text(`Position: (${player.row}, ${player.col})`, offsetX + 200, hudY);
+    text(`Position: (${player.row}, ${player.col})`, offsetX + 100, hudY);
     
     // Goal
-    text(`Goal: (${player.targetRow}, ${player.targetCol})`, offsetX + 400, hudY);
+    text(`Goal: (${player.targetRow}, ${player.targetCol})`, offsetX + 250, hudY);
+
+    text(`Level: (${currentLevel + 1}/4)`, offsetX + 400, hudY);
 }
 
 function drawWinMessage() {
@@ -265,33 +303,52 @@ function keyPressed() {
         return;
     }
     
-    let moved = false;
-    
-    // STUDENT TODO: Confirm arrow key controls work
-    if (keyCode === UP_ARROW) {
-        if (maze.canMove(player.row, player.col, 'up')) {
-            player.row--;
-            moved = true;
-        }
-    } else if (keyCode === DOWN_ARROW) {
-        if (maze.canMove(player.row, player.col, 'down')) {
-            player.row++;
-            moved = true;
-        }
-    } else if (keyCode === LEFT_ARROW) {
-        if (maze.canMove(player.row, player.col, 'left')) {
-            player.col--;
-            moved = true;
-        }
-    } else if (keyCode === RIGHT_ARROW) {
-        if (maze.canMove(player.row, player.col, 'right')) {
-            player.col++;
-            moved = true;
+    const dir = directionFromKey(key, keyCode);
+    if (dir) {
+        activeDirection = dir;
+        lastKeyPressTime = millis();
+        lastMoveTime = millis();
+        if (attemptMove(dir) && player.row === player.targetRow && player.col === player.targetCol) {
+            gameState = 'won';
         }
     }
-    
-    // Check if player reached goal
-    if (moved && player.row === player.targetRow && player.col === player.targetCol) {
-        gameState = 'won';
+}
+
+function keyReleased() {
+    const dir = directionFromKey(key, keyCode);
+    if (dir && dir === activeDirection) {
+        activeDirection = null;
+    }
+}
+
+function directionFromKey(keyChar, code) {
+    if (code === UP_ARROW || keyChar === 'w' || keyChar === 'W') return 'up';
+    if (code === DOWN_ARROW || keyChar === 's' || keyChar === 'S') return 'down';
+    if (code === LEFT_ARROW || keyChar === 'a' || keyChar === 'A') return 'left';
+    if (code === RIGHT_ARROW || keyChar === 'd' || keyChar === 'D') return 'right';
+    return null;
+}
+
+function attemptMove(direction) {
+    if (maze.canMove(player.row, player.col, direction)) {
+        if (direction === 'up') player.row--;
+        if (direction === 'down') player.row++;
+        if (direction === 'left') player.col--;
+        if (direction === 'right') player.col++;
+        return true;
+    }
+    return false;
+}
+
+function handleHeldMovement() {
+    if (!activeDirection) return;
+    const now = millis();
+    if (now - lastKeyPressTime < HOLD_DELAY) return;
+    if (now - lastMoveTime < REPEAT_RATE) return;
+    if (attemptMove(activeDirection)) {
+        lastMoveTime = now;
+    } else {
+        // Stop repeating if blocked to avoid unnecessary checks
+        lastMoveTime = now;
     }
 }
