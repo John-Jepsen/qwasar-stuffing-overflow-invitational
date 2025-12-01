@@ -8,6 +8,15 @@ const CONFIG = {
     targetDistance: 400  // Distance to target
 };
 
+// Optional sprite set toggle (use alt art without changing gameplay)
+const SPRITE_SET = 'default'; // set to 'contrib-0bitbybit' to try 0bitbybit's alt sprites
+const PUMPKIN_SPRITE = SPRITE_SET === 'contrib-0bitbybit'
+    ? 'assets/contrib-0bitbybit/pumpkin.png'
+    : 'assets/pumpkin.png';
+const TURKEY_SPRITE = SPRITE_SET === 'contrib-0bitbybit'
+    ? 'assets/contrib-0bitbybit/turkey.png'
+    : 'assets/turkey.png';
+
 let angle = 45;
 let power = 15;
 let projectile = null;
@@ -34,12 +43,12 @@ function preload() {
             () => { console.log('Background image not found, using gradient'); backgroundImg = null; }
         );
         
-        pumpkinImg = loadImage('assets/pumpkin.png', 
+        pumpkinImg = loadImage(PUMPKIN_SPRITE, 
             () => console.log('Pumpkin loaded'),
             () => { console.log('Pumpkin image not found, using circle'); pumpkinImg = null; }
         );
         
-        targetImgs.turkey = loadImage('assets/turkey.png',
+        targetImgs.turkey = loadImage(TURKEY_SPRITE,
             () => console.log('Turkey loaded'),
             () => { console.log('Turkey image not found, using shape'); targetImgs.turkey = null; }
         );
